@@ -1,0 +1,22 @@
+# Xcode / build artifacts
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Xcode user state (keep the shared scheme under xcshareddata)
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods (unused in Phase A, ignored if introduced later)
+Pods/
