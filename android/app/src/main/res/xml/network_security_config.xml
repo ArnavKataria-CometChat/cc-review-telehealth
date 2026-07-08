@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Allows cleartext HTTP only to local development hosts so the emulator/device
+  can reach the backend on the dev machine. 10.0.2.2 is the emulator's alias for
+  the host loopback. Production traffic stays HTTPS-only (cleartext disabled by
+  default on API 28+).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

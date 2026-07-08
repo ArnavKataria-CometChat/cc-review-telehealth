@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base window theme used until Compose draws; the real UI theming lives in
+         TelehealthTheme (Material 3, Compose). NoActionBar + edge-to-edge. -->
+    <style name="Theme.TelehealthConsult" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/brand_primary</item>
+    </style>
+</resources>
