@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { AppShell } from '@/components/AppShell';
+import { CometChatGate } from '@/lib/cometchat/CometChatGate';
 
 export const metadata: Metadata = {
   title: 'TeleHealth — Consult Platform',
@@ -18,7 +19,11 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          {/* CometChat logs in alongside the session and mounts the app-wide
+              incoming-call listener; it never blocks the portal from rendering. */}
+          <CometChatGate>
+            <AppShell>{children}</AppShell>
+          </CometChatGate>
         </AuthProvider>
       </body>
     </html>

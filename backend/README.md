@@ -2,8 +2,9 @@
 
 Backend service for a telehealth consult platform where **patients** book video
 consults with **doctors**, **staff** coordinate scheduling, and **admins** oversee
-clinics. This is the **Phase A baseline**: the full domain + RBAC, with **no chat or
-calling** yet. The seams where CometChat plugs in later are documented but unbuilt.
+clinics. The full domain + RBAC, plus **Phase B CometChat** server-side integration:
+mapping app users → CometChat users and minting per-user auth tokens, with
+appointment-scoped 1:1 chat/call access (see [Phase B](#phase-b--cometchat-integration-server-side)).
 
 - **Stack:** Node.js + Express + TypeScript (strict)
 - **Auth:** email/password → JWT session carrying a stable `{ userId, role }`
@@ -64,8 +65,11 @@ Base path: `/api`. All responses are JSON. Errors use
 | `GET  /clinics` | admin | List clinics |
 | `POST /clinics` · `PATCH /clinics/:id` · `DELETE /clinics/:id` | admin | Clinic CRUD |
 | `GET  /admin/users?role=` | admin | User directory |
-| `POST /admin/users` | admin | Create doctor/staff/patient/admin |
+| `POST /admin/users` | admin | Create doctor/staff/patient/admin (also provisions a CometChat user) |
 | `GET  /admin/audit?limit=` | admin | Audit trail |
+| `GET  /cometchat/config` | any | Non-secret client bootstrap: `{ configured, appId, region }` |
+| `POST /cometchat/token` | any | Provision/sync the caller's CometChat user + mint their auth token |
+| `GET  /cometchat/appointments/:id/chat` | role-scoped | 1:1 chat/call context for an appointment (see Phase B below) |
 | `GET  /health` | public | Liveness probe |
 
 ---
@@ -84,8 +88,17 @@ Copy `.env.example` → `.env`. No secrets are hardcoded.
 | `BCRYPT_ROUNDS` | `10` | Password hash cost |
 | `SEED_PASSWORD` | `Passw0rd!` | Password for all seeded demo accounts |
 
-CometChat placeholders (`COMETCHAT_*`) are listed in `.env.example` for Phase B and
-are **not** used yet.
+### CometChat (Phase B)
+
+| Var | Where | Notes |
+| --- | --- | --- |
+| `COMETCHAT_APP_ID` | server + safe for clients | Returned by `GET /cometchat/config` |
+| `COMETCHAT_REGION` | server + safe for clients | `us` \| `eu` \| `in` |
+| `COMETCHAT_AUTH_KEY` | not used by backend | Client/dev convenience key; kept in env only |
+| `COMETCHAT_REST_API_KEY` | **server only** | fullAccess scope — mints tokens + user CRUD. Never sent to clients or committed |
+
+If these are empty the backend still builds and runs; the CometChat routes return
+`503 cometchat_not_configured` until they are set. `.env` is gitignored.
 
 ---
 
@@ -148,24 +161,48 @@ src/
   middleware/         authenticate, authorize, error handler, HttpError
   domain/             entity types + response views
   db/                 in-memory store + seed
-  routes/             auth, users, doctors, slots, appointments, clinics, admin
-  services/           audit log
+  routes/             auth, users, doctors, slots, appointments, clinics, admin, cometchat
+  services/           audit log, cometchat (REST client: user sync + token mint)
 ```
 
 ---
 
-## Phase B seam (CometChat — not implemented here)
+## Phase B — CometChat integration (server-side)
 
 The spec calls for 1:1 chat + video on the **appointment detail** screen, scoped to
-that appointment's **patient and doctor**. This baseline deliberately leaves it
-unbuilt but ready:
+that appointment's **patient and doctor**. The backend owns the server-side half:
+mapping app users → CometChat users and minting auth tokens. **The REST API Key
+never leaves the server** — clients receive only App ID, Region, and a per-user
+token, and log in with `CometChatUIKit.loginWithAuthToken(token)`.
 
-- Each `User` already has a stable server-side `id` + `role` to map to a CometChat
-  user.
-- `appointmentView` returns `participants: [patientId, doctorId]` — the exact 1:1
-  conversation scope.
-- Secrets belong in backend env (`COMETCHAT_*` placeholders in `.env.example`); the
-  frontend will log in with a backend-issued CometChat auth token.
-- Staff = coordination/system messages only; admin = read-only metadata audit.
+### Token + user provisioning
 
-**No chat SDKs, websockets, or CometChat code are present in Phase A.**
+- **`POST /cometchat/token`** — derives the UID from the verified session (never the
+  request body), idempotently creates/syncs the caller's CometChat user, and returns
+  `{ uid, authToken, appId, region }`. The app role is carried on the CometChat user
+  via `metadata.appRole` + `tags` (the built-in `role` field is dashboard-gated and
+  rejects arbitrary values).
+- Admin user-creation also provisions a CometChat user (best-effort, non-blocking).
+- No credentials → routes return `503 cometchat_not_configured`; the rest of the API
+  is unaffected.
+
+### RBAC → CometChat conversation scoping
+
+`GET /cometchat/appointments/:id/chat` enforces exactly who may converse/call:
+
+| Caller | Result |
+| --- | --- |
+| **patient** (the appointment's own) | `200` — `peer` = the booked doctor, `canChat/canCall: true` |
+| **doctor** (the appointment's own) | `200` — `peer` = the patient, `canChat/canCall: true` |
+| **staff** | `403` — no clinical chat |
+| **admin** | `200` — read-only audit metadata (`participants`, `canChat/canCall: false`) |
+| patient/doctor who isn't a participant | `403` |
+
+The conversation is implicitly scoped per appointment: the two participant UIDs are
+the app user ids, so the client points a 1:1 conversation at exactly the returned
+`peer`. Calling reuses the same participant pair.
+
+`appointmentView` still returns `participants: [patientId, doctorId]` for the
+appointment-detail screen. Implementation lives in `src/services/cometchat.ts` +
+`src/routes/cometchat.ts`; no chat SDK/websocket runs inside this backend — the
+clients hold the realtime connection.

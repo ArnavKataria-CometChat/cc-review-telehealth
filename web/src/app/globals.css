@@ -681,3 +681,29 @@ tbody tr:hover {
 .demo-chip:hover {
   border-color: var(--primary);
 }
+
+/* --------------------------------------------- CometChat consult surface */
+
+/* The UI Kit fills 100% of its container, so the consult needs an explicit
+   height. A flex column keeps header + composer pinned while the message list
+   scrolls between them (the `min-height: 0` frees the list to shrink). */
+.cc-consult {
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.cc-consult .cc-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cc-consult .cc-list > .cometchat {
+  height: 100%;
+  overflow: hidden;
+}

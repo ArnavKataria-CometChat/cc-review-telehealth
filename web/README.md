@@ -51,6 +51,9 @@ The portal calls `${NEXT_PUBLIC_API_BASE_URL}/api/...` with a
 | `GET  /api/clinics` · `POST` · `PATCH /:id` · `DELETE /:id` | admin | Clinics CRUD |
 | `GET  /api/admin/users?role=` · `POST /api/admin/users` | admin | Users directory + provisioning |
 | `GET  /api/admin/audit?limit=` | admin | Audit log |
+| `GET  /api/cometchat/config` | any | Non-secret bootstrap: `{ configured, appId, region }` |
+| `POST /api/cometchat/token` | any | Provision/sync the caller's CometChat user + mint an auth token: `{ uid, authToken, appId, region }` |
+| `GET  /api/cometchat/appointments/:id/chat` | participants (patient/doctor), admin | Appointment 1:1 chat/call context (staff → 403) |
 
 The typed client lives in [`src/lib/api.ts`](src/lib/api.ts); response shapes are
 mirrored in [`src/lib/types.ts`](src/lib/types.ts).
@@ -143,17 +146,29 @@ docker run --rm -p 3000:3000 telehealth-web
 
 ---
 
-## Phase B seam (CometChat — not built here)
+## CometChat (Phase B — chat + calling)
 
-- **Where:** the **appointment detail** screen (`/appointments/[id]`) hosts a
-  1:1 chat + video call scoped to exactly that appointment's **patient and
-  doctor**. The "Join video consult" button (enabled while a consult is *in
-  progress*) is the placeholder for it today.
-- **Identity mapping:** each app user already has a stable server-side
-  `{ userId, role }`; Phase B creates/syncs a CometChat user per app user
-  carrying that role, and a patient may only converse/call with their booked
-  doctor (and vice-versa).
-- **staff:** no clinical chat — system/coordination messages only.
+Built with the CometChat React UI Kit v6 (`@cometchat/chat-uikit-react`) plus the
+JS chat + calls SDKs. Integration points:
+
+- **Provider:** [`src/lib/cometchat/CometChatProvider.tsx`](src/lib/cometchat/CometChatProvider.tsx),
+  mounted app-wide via a `next/dynamic({ ssr: false })` gate
+  ([`CometChatGate.tsx`](src/lib/cometchat/CometChatGate.tsx)) so the browser-only
+  kit never runs during SSR / static prerender. It logs in/out in lockstep with
+  the telehealth session and mounts `<CometChatIncomingCall />` at the root so a
+  patient/doctor is rung anywhere in the portal.
+- **Auth:** the client holds **no** CometChat config or secrets. On login it calls
+  `POST /api/cometchat/token` → `{ uid, authToken, appId, region }`, inits the SDK
+  with that App ID + Region, and logs in via `loginWithAuthToken`.
+- **Where:** the **appointment detail** screen (`/appointments/[id]`) hosts the
+  live 1:1 chat + voice/video call scoped to exactly that appointment's **patient
+  and doctor** ([`AppointmentConsult.tsx`](src/components/cometchat/AppointmentConsult.tsx)).
+  The peer is resolved from `GET /api/cometchat/appointments/:id/chat`, which the
+  backend RBAC-gates.
+- **Identity mapping:** the backend creates/syncs a CometChat user per app user
+  carrying its role; a patient may only converse/call with their booked doctor
+  (and vice-versa) — enforced server-side on every message/call.
+- **staff:** no clinical chat (the chat context endpoint 403s them).
 - **admin:** read-only audit of conversation metadata — never a participant.
-- **Secrets:** stay in the backend env; the frontend authenticates to CometChat
-  with a backend-issued auth token.
+- **Secrets:** the CometChat App ID / Region / Auth Key and the server-only REST
+  API Key all live in the backend env — none ship in the web bundle.

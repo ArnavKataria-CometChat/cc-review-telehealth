@@ -7,6 +7,7 @@ import { doctorView } from '../domain/views';
 import { authorize } from '../middleware/authorize';
 import { badRequest } from '../middleware/httpError';
 import { audit, listAudit } from '../services/audit';
+import { syncUserBestEffort } from '../services/cometchat';
 import { asyncHandler } from '../utils/asyncHandler';
 
 // Admin-only: user management (doctors/staff/patients) + audit log view.
@@ -87,6 +88,10 @@ adminRouter.post(
     }
 
     audit(req.user!, 'user.create', `user:${user.id}`, `role:${user.role}`);
+    // Phase B: proactively provision the CometChat user (carrying role). Best
+    // effort + fire-and-forget — never blocks or fails account creation; the
+    // token endpoint also provisions lazily on first login as a safety net.
+    void syncUserBestEffort(toPublicUser(user));
     const profile =
       data.role === 'doctor' ? doctorView(store.doctors.get(user.id)!) : null;
     res.status(201).json({ user: toPublicUser(user), profile });
