@@ -24,6 +24,10 @@ object Routes {
     const val APPOINTMENT_DETAIL = "appointment/{appointmentId}"
     fun appointment(id: String) = "appointment/$id"
 
+    // Phase B: 1:1 secure chat + video/voice for an appointment (patient ↔ doctor).
+    const val CONSULT_CHAT = "consult/{appointmentId}"
+    fun consult(id: String) = "consult/$id"
+
     const val ARG_DOCTOR_ID = "doctorId"
     const val ARG_APPOINTMENT_ID = "appointmentId"
 }

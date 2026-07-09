@@ -2,6 +2,7 @@ package com.telehealth.consult.di
 
 import android.content.Context
 import com.telehealth.consult.data.ApiClient
+import com.telehealth.consult.data.ChatService
 import com.telehealth.consult.data.SessionStore
 import com.telehealth.consult.data.TelehealthRepository
 
@@ -20,4 +21,7 @@ class AppContainer(context: Context) {
     )
 
     val repository: TelehealthRepository = TelehealthRepository(api, session)
+
+    /** CometChat SDK lifecycle (Phase B). Initialized once by [TelehealthApp]. */
+    val chat: ChatService = ChatService(context, repository)
 }

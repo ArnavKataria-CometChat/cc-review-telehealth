@@ -10,5 +10,8 @@ class TelehealthApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Initialize the CometChat SDK once at process start (Phase B). Login is
+        // chained off the app session (see AppRoot), not here.
+        container.chat.initialize()
     }
 }

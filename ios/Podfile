@@ -1,0 +1,38 @@
+# CocoaPods is the dependency manager for the CometChat integration (Phase B).
+#
+# Why CocoaPods and not SwiftPM: the public SwiftPM package
+# `github.com/cometchat/cometchat-uikit-ios` ships a single binary target whose
+# module hard-imports `CometChatSDK` and `CometChatCardsSwift`, but its
+# Package.swift declares neither as a dependency — so a SwiftPM-only install
+# fails at compile time with "No such module 'CometChatCardsSwift'". The
+# CocoaPods artifact bundles the full framework closure, so `pod install`
+# produces a buildable target. (See INTEGRATION SUMMARY / README for details.)
+#
+# After `pod install`, build the generated `Telehealth.xcworkspace`
+# (verify.sh already does this).
+platform :ios, '17.0'
+use_frameworks!
+
+target 'Telehealth' do
+  # UI Kit (pulls CometChatSDK ~> 4.1).
+  pod 'CometChatUIKitSwift', '~> 5.1'
+  # CometChatSDK 4.1.x hard-imports the CometChatStarscream module, but the
+  # published CometChatSDK pod artifact doesn't bundle it (upstream gap) — vendor
+  # it from a local podspec pointing at CometChat's framework CDN.
+  pod 'CometChatStarscream', :podspec => 'CometChatStarscream.podspec'
+  # UI Kit 5.1.16's binary hard-imports CometChatCardsSwift, but its podspec
+  # FAILS to declare the dependency (upstream bug) — declare it explicitly or
+  # the app fails to compile with "No such module 'CometChatCardsSwift'".
+  pod 'CometChatCardsSwift', '~> 1.1'
+  # Voice/video calling (kept explicit — the UI Kit podspec does not pull it).
+  pod 'CometChatCallsSDK', '~> 5.0'
+end
+
+post_install do |installer|
+  # Xcode 15+: the CometChat pods run resource scripts that the sandbox blocks.
+  installer.pods_project.targets.each do |t|
+    t.build_configurations.each do |config|
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+    end
+  end
+end

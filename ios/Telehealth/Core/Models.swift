@@ -155,6 +155,47 @@ struct ConsultationNote: Codable, Identifiable, Hashable {
     let createdAt: String
 }
 
+// MARK: - CometChat (Phase B)
+//
+// The iOS client holds NO CometChat secret. It calls the backend, which
+// provisions the caller's CometChat user (carrying their role) and mints a
+// short-lived auth token; the App ID + Region returned here are non-secret
+// client bootstrap values. See ../backend/src/routes/cometchat.ts.
+
+/// `POST /cometchat/token` — the caller's CometChat identity + login token.
+struct CometChatToken: Decodable {
+    let uid: String
+    let authToken: String
+    let appId: String
+    let region: String
+}
+
+/// `GET /cometchat/appointments/:id/chat` — RBAC-scoped access descriptor for
+/// the 1:1 consult conversation. Patient/doctor receive a `peer` (their
+/// counterpart) with `canChat`/`canCall = true`; admin receives audit metadata
+/// (`audit = true`, no participation); staff are rejected with 403.
+struct AppointmentChatAccess: Decodable {
+    struct Party: Decodable, Hashable {
+        let uid: String
+        let role: Role?
+        let name: String?
+        let appointmentId: String?
+    }
+
+    let appointmentId: String
+    let selfParty: Party?
+    let peer: Party?
+    let canChat: Bool
+    let canCall: Bool
+    let audit: Bool?
+    let participants: [Party]?
+
+    private enum CodingKeys: String, CodingKey {
+        case appointmentId, peer, canChat, canCall, audit, participants
+        case selfParty = "self"
+    }
+}
+
 // MARK: - Audit
 
 struct AuditEntry: Codable, Identifiable, Hashable {

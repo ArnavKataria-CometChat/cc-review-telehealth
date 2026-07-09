@@ -47,6 +47,10 @@ class ApiClient(
     suspend fun <B, R> post(path: String, body: B, bodySer: KSerializer<B>, response: KSerializer<R>): R =
         execute(request(path).post(jsonBody(body, bodySer)).build(), response)
 
+    /** POST with an empty JSON body — for endpoints that derive everything from the session. */
+    suspend fun <R> post(path: String, response: KSerializer<R>): R =
+        execute(request(path).post("{}".toRequestBody(JSON_MEDIA)).build(), response)
+
     suspend fun <B, R> patch(path: String, body: B, bodySer: KSerializer<B>, response: KSerializer<R>): R =
         execute(request(path).patch(jsonBody(body, bodySer)).build(), response)
 

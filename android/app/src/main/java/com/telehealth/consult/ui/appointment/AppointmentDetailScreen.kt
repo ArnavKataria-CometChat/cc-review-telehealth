@@ -58,7 +58,12 @@ import kotlinx.coroutines.launch
  * table); the video/chat block is a deliberately-unbuilt CometChat seam.
  */
 @Composable
-fun AppointmentDetailScreen(appointmentId: String, user: PublicUser, onBack: () -> Unit) {
+fun AppointmentDetailScreen(
+    appointmentId: String,
+    user: PublicUser,
+    onBack: () -> Unit,
+    onOpenChat: (String) -> Unit,
+) {
     val repo = LocalContainer.current.repository
     val scope = rememberCoroutineScope()
     val action = rememberActionState()
@@ -88,7 +93,7 @@ fun AppointmentDetailScreen(appointmentId: String, user: PublicUser, onBack: () 
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OverviewCard(appt)
-                ConsultSeamCard(appt, user)
+                ConsultSeamCard(appt, user, onOpenChat)
                 ActionsSection(appt, user, action.running) { mutate(it) }
                 action.error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -137,14 +142,19 @@ private fun InfoRow(label: String, value: String) {
 }
 
 /**
- * Phase B seam. The 1:1 video + chat between this appointment's patient and
- * doctor plugs in here. Staff/admin are never chat participants (staff =
- * coordination only, admin = read-only metadata audit), so they see a note.
+ * The 1:1 video + secure chat entry point between this appointment's patient and
+ * doctor (CometChat, Phase B). Only participants get the button; the backend is
+ * the authority and hard-gates who may join. Staff/admin are never chat
+ * participants (staff = coordination only, admin = read-only metadata audit), so
+ * they see a note instead.
  */
 @Composable
-private fun ConsultSeamCard(appt: AppointmentView, user: PublicUser) {
+private fun ConsultSeamCard(
+    appt: AppointmentView,
+    user: PublicUser,
+    onOpenChat: (String) -> Unit,
+) {
     val isParticipant = user.id == appt.patient.userId || user.id == appt.doctor.userId
-    val liveNow = appt.status == AppointmentStatus.IN_PROGRESS
 
     Card(
         Modifier.fillMaxWidth(),
@@ -167,13 +177,10 @@ private fun ConsultSeamCard(appt: AppointmentView, user: PublicUser) {
                     "Coordination only — staff are not participants in the clinical conversation."
                 !isParticipant ->
                     "Read-only oversight — admins audit conversation metadata but do not join."
-                liveNow ->
-                    "This consult is in progress. 1:1 video + chat activates here in Phase B (CometChat)."
                 else ->
-                    "1:1 video + secure chat between you and " +
+                    "Secure 1:1 chat and video/voice calling with " +
                         (if (user.id == appt.patient.userId) appt.doctor.name ?: "your doctor"
-                        else appt.patient.name ?: "the patient") +
-                        " activates here when the consult starts (Phase B)."
+                        else appt.patient.name ?: "the patient") + "."
             }
             Text(
                 body,
@@ -182,12 +189,11 @@ private fun ConsultSeamCard(appt: AppointmentView, user: PublicUser) {
             )
             if (isParticipant) {
                 Button(
-                    onClick = {},
-                    enabled = false,
+                    onClick = { onOpenChat(appt.id) },
                     modifier = Modifier.padding(top = 12.dp),
                 ) {
                     Icon(Icons.Filled.Videocam, contentDescription = null)
-                    Text("  Join consult (Phase B)")
+                    Text("  Open secure chat & call")
                 }
             }
             Badge("Scope: ${appt.participants.joinToString(" ↔ ")}", MaterialTheme.colorScheme.tertiary)

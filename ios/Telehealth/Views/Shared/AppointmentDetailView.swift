@@ -100,13 +100,13 @@ struct AppointmentDetailView: View {
 
     // MARK: - Phase B seam: consult room
 
-    /// The 1:1 video + chat surface. In Phase A this is an explicit, disabled
-    /// placeholder; Phase B replaces it with a CometChat call+conversation
-    /// scoped to `appt.participants` (patient <-> doctor only).
+    /// The 1:1 video + chat surface. Phase B renders a CometChat call +
+    /// conversation scoped to the appointment's patient ↔ doctor pair. Only
+    /// those two participants see it; staff have no clinical chat and admins
+    /// audit conversation metadata server-side (not as a participant), so the
+    /// section is hidden for them.
     @ViewBuilder
     private func consultRoomSection(_ appt: Appointment) -> some View {
-        // Only patient/doctor participants ever see the consult room; staff and
-        // admin coordinate/audit but are not in the conversation.
         let isParticipant = role == .patient || role == .doctor
         if isParticipant {
             Section("Consult Room") {
@@ -114,22 +114,8 @@ struct AppointmentDetailView: View {
                     Label("Consult in progress", systemImage: "waveform.badge.mic")
                         .foregroundStyle(.green)
                 }
-                Button {
-                    // Phase B: launch CometChat call for this appointment.
-                } label: {
-                    Label("Join Video Call", systemImage: "video.fill")
-                }
-                .disabled(true)
-                Button {
-                    // Phase B: open the CometChat 1:1 conversation.
-                } label: {
-                    Label("Open Chat", systemImage: "bubble.left.and.bubble.right.fill")
-                }
-                .disabled(true)
-                Text(appt.status == .inProgress
-                     ? "Video & chat activate here in Phase B (CometChat)."
-                     : "Available while the consult is in progress (Phase B).")
-                    .font(.footnote).foregroundStyle(.secondary)
+                ConsultRoomView(appointment: appt)
+                    .environmentObject(session)
             }
         }
     }

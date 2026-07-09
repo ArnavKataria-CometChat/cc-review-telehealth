@@ -3,6 +3,23 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- CometChat voice/video calling (Phase B). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <!-- Foreground-service types for an ongoing call on Android 14+. Manifest
+         merge does NOT pull permissions across module boundaries, so the app
+         must declare these even though the kit provides the service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:name=".TelehealthApp"
         android:allowBackup="true"
