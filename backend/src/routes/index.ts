@@ -7,6 +7,7 @@ import { slotsRouter } from './slots';
 import { appointmentsRouter } from './appointments';
 import { clinicsRouter } from './clinics';
 import { adminRouter } from './admin';
+import { cometchatRouter } from './cometchat';
 
 export const apiRouter = Router();
 
@@ -22,3 +23,5 @@ apiRouter.use('/slots', slotsRouter);
 apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/clinics', clinicsRouter);
 apiRouter.use('/admin', adminRouter);
+// Phase B: CometChat token minting + appointment-scoped chat/call context.
+apiRouter.use('/cometchat', cometchatRouter);

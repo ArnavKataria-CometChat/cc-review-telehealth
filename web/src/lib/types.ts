@@ -94,3 +94,45 @@ export interface AuditEntry {
   target: string;
   detail?: string;
 }
+
+// --- CometChat (Phase B) response shapes (../backend/src/routes/cometchat.ts) ---
+
+/** Non-secret client bootstrap: App ID + Region only, plus whether the backend
+ *  has CometChat credentials configured. */
+export interface CometChatConfig {
+  configured: boolean;
+  appId: string | null;
+  region: string | null;
+}
+
+/** `POST /cometchat/token` — the caller's provisioned CometChat identity plus a
+ *  fresh, per-user auth token. App ID + Region ride along so the client never
+ *  needs CometChat config in its own bundle. Minted for `req.user` only. */
+export interface CometChatSession {
+  uid: string;
+  authToken: string;
+  appId: string;
+  region: string;
+}
+
+/** A participant's public CometChat identity for an appointment conversation. */
+export interface CometChatPeer {
+  uid: string;
+  role: Role | null;
+  name: string;
+  appointmentId: string;
+}
+
+/** `GET /cometchat/appointments/:id/chat` — who the caller may 1:1 chat/call with
+ *  for this appointment, per the RBAC → CometChat mapping enforced server-side:
+ *  patient/doctor get a `peer` + `canChat/canCall: true`; admin gets audit-only
+ *  metadata (`audit: true`, `participants`); staff get 403 (never this shape). */
+export interface AppointmentChatContext {
+  appointmentId: string;
+  self?: { uid: string; role: Role };
+  peer?: CometChatPeer;
+  canChat: boolean;
+  canCall: boolean;
+  audit?: boolean;
+  participants?: CometChatPeer[];
+}

@@ -5,10 +5,13 @@
 // and surfaces 401s so the auth layer can log the user out.
 
 import type {
+  AppointmentChatContext,
   AppointmentStatus,
   AppointmentView,
   AuditEntry,
   Clinic,
+  CometChatConfig,
+  CometChatSession,
   DoctorView,
   MeResponse,
   NoteView,
@@ -220,6 +223,23 @@ export const api = {
     return request<{ entries: AuditEntry[] }>('/admin/audit', {
       query: { limit: String(limit) },
     });
+  },
+
+  // --- CometChat (Phase B) ---
+  // Non-secret bootstrap: App ID + Region (+ `configured`). No secrets returned.
+  cometchatConfig() {
+    return request<CometChatConfig>('/cometchat/config');
+  },
+  // Provision/sync the caller's CometChat identity and mint a per-user auth
+  // token. The UID is derived server-side from the session, never the client.
+  cometchatToken() {
+    return request<CometChatSession>('/cometchat/token', { method: 'POST' });
+  },
+  // Who the caller may 1:1 chat/call with for this appointment (RBAC-scoped).
+  cometchatAppointmentChat(appointmentId: string) {
+    return request<AppointmentChatContext>(
+      `/cometchat/appointments/${appointmentId}/chat`,
+    );
   },
 };
 

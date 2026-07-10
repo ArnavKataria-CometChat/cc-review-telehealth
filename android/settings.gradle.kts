@@ -17,6 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // CometChat UI Kit v6 + Chat/Calls SDKs (Phase B).
+        maven { url = uri("https://dl.cloudsmith.io/public/cometchat/cometchat/maven/") }
     }
 }
 

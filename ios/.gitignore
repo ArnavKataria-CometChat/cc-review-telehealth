@@ -18,5 +18,16 @@ xcuserdata/
 .swiftpm/
 .build/
 
-# CocoaPods (unused in Phase A, ignored if introduced later)
+# CocoaPods — added in Phase B for the CometChat dependency. Pods/ and the
+# generated workspace are rebuilt from Podfile + Podfile.lock by `pod install`
+# (verify.sh runs it on demand). Podfile and Podfile.lock ARE committed.
 Pods/
+Telehealth.xcworkspace/
+
+# Secrets — the iOS client holds no CometChat secret (App ID/Region/auth token
+# come from the backend at runtime), but never commit local env/cred overrides.
+.env
+.env.*
+*.local.xcconfig
+Secrets.swift
+CometChat.xcconfig

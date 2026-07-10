@@ -10,24 +10,31 @@ cd "$(dirname "$0")"
 
 SCHEME="Telehealth"
 PROJECT="Telehealth.xcodeproj"
+WORKSPACE="Telehealth.xcworkspace"
 
-echo "==> iOS build gate: $SCHEME ($PROJECT)"
+echo "==> iOS build gate: $SCHEME"
 
-# Pick a concrete available simulator runtime/device where possible; fall back
-# to a generic destination if none is found (xcodebuild still builds for the
-# iphonesimulator SDK either way).
-DESTINATION="generic/platform=iOS Simulator"
-if command -v xcrun >/dev/null 2>&1; then
-  DEVICE_ID="$(xcrun simctl list devices available 2>/dev/null \
-    | grep -Eo '\([0-9A-F-]{36}\)' | head -n1 | tr -d '()' || true)"
-  if [ -n "${DEVICE_ID:-}" ]; then
-    DESTINATION="id=${DEVICE_ID}"
+# Phase B added a CocoaPods dependency (CometChat). Pods/ is gitignored, so a
+# fresh checkout must run `pod install` before the workspace can build. Install
+# on demand, then build the workspace instead of the bare project.
+BUILD_ARGS=(-project "$PROJECT")
+if [ -f "Podfile" ]; then
+  if [ ! -d "Pods" ] || [ ! -d "$WORKSPACE" ]; then
+    echo "==> Pods not installed; running 'pod install'"
+    pod install
   fi
+  BUILD_ARGS=(-workspace "$WORKSPACE")
 fi
+echo "==> Building with: ${BUILD_ARGS[*]}"
+
+# Build for the iOS Simulator SDK without pinning a specific booted device.
+# The generic destination always resolves as long as an iOS Simulator runtime is
+# installed, which is all a build-only gate needs (no device boot required).
+DESTINATION="generic/platform=iOS Simulator"
 echo "==> Destination: ${DESTINATION}"
 
 xcodebuild \
-  -project "$PROJECT" \
+  "${BUILD_ARGS[@]}" \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
   -configuration Debug \

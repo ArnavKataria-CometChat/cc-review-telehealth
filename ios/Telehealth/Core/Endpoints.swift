@@ -200,4 +200,14 @@ extension APIClient {
             "GET", "/admin/audit", query: [.init(name: "limit", value: String(limit))])
         return res.entries
     }
+
+    // CometChat (Phase B) — the UID is derived server-side from the session, so
+    // no body is sent; a caller can only ever mint a token for themselves.
+    func cometchatToken() async throws -> CometChatToken {
+        try await request("POST", "/cometchat/token")
+    }
+
+    func appointmentChatAccess(appointmentId: String) async throws -> AppointmentChatAccess {
+        try await request("GET", "/cometchat/appointments/\(appointmentId)/chat")
+    }
 }

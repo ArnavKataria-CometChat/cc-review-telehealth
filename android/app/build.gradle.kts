@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+// CometChat client credentials (Phase B). App ID + Region only — these are the
+// non-secret values a client is allowed to hold. The REST API Key and Auth Key
+// stay server-side (../backend); the client logs in with a backend-issued auth
+// token. Values live in local.properties (gitignored) and surface as BuildConfig
+// fields — never hardcoded in source, never committed.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 // Base URL of the backend REST API (../backend, Express on :4000).
@@ -20,13 +32,24 @@ android {
 
     defaultConfig {
         applicationId = "com.telehealth.consult"
-        minSdk = 24
+        // CometChat UI Kit v6 requires minSdk 28 (raised from 24 for Phase B).
+        minSdk = 28
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField(
+            "String",
+            "COMETCHAT_APP_ID",
+            "\"${localProps.getProperty("cometchat.appId", "")}\"",
+        )
+        buildConfigField(
+            "String",
+            "COMETCHAT_REGION",
+            "\"${localProps.getProperty("cometchat.region", "")}\"",
+        )
     }
 
     buildTypes {
@@ -57,9 +80,23 @@ android {
     }
 }
 
+configurations.all {
+    // The CometChat Chat SDK transitively pulls org.jetbrains:annotations-java5,
+    // which duplicate-classes with Kotlin stdlib's org.jetbrains:annotations.
+    exclude(group = "org.jetbrains", module = "annotations-java5")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.08.00")
     implementation(composeBom)
+
+    // --- CometChat (Phase B): chat + calling, Jetpack Compose UI Kit v6 --------
+    // 6.0.+ tracks the latest GA patch (never pin a -beta). The Calls SDK is a
+    // REQUIRED peer dep even though V6 markets calling as "bundled": the chatuikit
+    // AAR bytecode-references CometChatCalls$SessionSettingsBuilder, which ships
+    // only in calls-sdk-android — without it the app crashes at init.
+    implementation("com.cometchat:chatuikit-compose-android:6.0.+")
+    implementation("com.cometchat:calls-sdk-android:5.0.+")
 
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")

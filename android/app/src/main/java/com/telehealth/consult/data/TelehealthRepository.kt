@@ -3,9 +3,11 @@ package com.telehealth.consult.data
 import com.telehealth.consult.data.model.AppointmentResponse
 import com.telehealth.consult.data.model.AppointmentView
 import com.telehealth.consult.data.model.AppointmentsResponse
+import com.telehealth.consult.data.model.AppointmentChatContext
 import com.telehealth.consult.data.model.AuditEntry
 import com.telehealth.consult.data.model.AuditResponse
 import com.telehealth.consult.data.model.BookAppointmentRequest
+import com.telehealth.consult.data.model.CometChatToken
 import com.telehealth.consult.data.model.Clinic
 import com.telehealth.consult.data.model.ClinicRequest
 import com.telehealth.consult.data.model.ClinicResponse
@@ -185,6 +187,26 @@ class TelehealthRepository(
             AuditResponse.serializer(),
             mapOf("limit" to limit.toString()),
         ).entries
+
+    // --- CometChat (Phase B) ----------------------------------------------
+
+    /**
+     * POST /api/cometchat/token — provision/sync this user's CometChat identity
+     * (carrying their role) and mint a fresh auth token. The UID is derived from
+     * the verified session server-side; a caller can only mint for themselves.
+     */
+    suspend fun cometchatToken(): CometChatToken =
+        api.post("cometchat/token", CometChatToken.serializer())
+
+    /**
+     * GET /api/cometchat/appointments/:id/chat — the RBAC-scoped 1:1 chat/call
+     * context for this appointment. Staff get a 403 (surfaces as [ApiException]).
+     */
+    suspend fun appointmentChat(appointmentId: String): AppointmentChatContext =
+        api.get(
+            "cometchat/appointments/$appointmentId/chat",
+            AppointmentChatContext.serializer(),
+        )
 }
 
 /** Local wrapper for POST /admin/users response `{ user, profile }`. */

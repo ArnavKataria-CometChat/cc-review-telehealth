@@ -7,7 +7,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Guard } from '@/components/Guard';
+
+// Browser-only: the CometChat UI Kit touches `window` at import time, so it must
+// never render on the server or during `next build`'s static prerender.
+const AppointmentConsult = dynamic(
+  () => import('@/components/cometchat/AppointmentConsult'),
+  { ssr: false, loading: () => <Spinner /> },
+);
 import {
   PageHeader,
   ErrorNotice,
@@ -142,26 +150,7 @@ function DetailInner() {
           <div className="card stack" style={{ gap: 12 }}>
             <h2 style={{ fontSize: 18 }}>Video consult &amp; chat</h2>
             {isChatParticipant ? (
-              <>
-                <button
-                  className="btn btn-primary"
-                  disabled={appt.status !== 'in_progress'}
-                  onClick={() =>
-                    setActionError(
-                      'Live chat & video arrive in Phase B (CometChat). This is the integration seam.',
-                    )
-                  }
-                >
-                  {appt.status === 'in_progress'
-                    ? 'Join video consult'
-                    : 'Consult not in progress'}
-                </button>
-                <div className="seam-note">
-                  <strong>Phase B seam.</strong> A 1:1 CometChat conversation for
-                  this appointment will connect exactly the patient and doctor.
-                  Enabled while the consult is <em>in progress</em>.
-                </div>
-              </>
+              <AppointmentConsult appointmentId={appt.id} />
             ) : role === 'staff' ? (
               <div className="seam-note">
                 Staff coordinate scheduling and receive system messages only — no

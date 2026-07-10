@@ -28,6 +28,15 @@ function resolveJwtSecret(): string {
   return DEV_SECRET;
 }
 
+// CometChat (Phase B). All values come from env — never hardcode. The REST API
+// key is server-only (full user CRUD + token minting) and MUST NOT be shipped to
+// any client bundle. Clients only ever receive appId + region + a minted token.
+const cometchatAppId = process.env.COMETCHAT_APP_ID ?? '';
+const cometchatRegion = process.env.COMETCHAT_REGION ?? '';
+const cometchatConfigured = Boolean(
+  cometchatAppId && cometchatRegion && process.env.COMETCHAT_REST_API_KEY,
+);
+
 export const config = {
   port: num(process.env.PORT, 4000),
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -38,4 +47,19 @@ export const config = {
   },
   bcryptRounds: num(process.env.BCRYPT_ROUNDS, 10),
   seedPassword: process.env.SEED_PASSWORD ?? 'Passw0rd!',
+  cometchat: {
+    appId: cometchatAppId,
+    region: cometchatRegion,
+    // authKey is a dev/client convenience credential; the backend never needs it
+    // for the token flow, but we surface it so ops can confirm it is env-sourced.
+    authKey: process.env.COMETCHAT_AUTH_KEY ?? '',
+    restApiKey: process.env.COMETCHAT_REST_API_KEY ?? '',
+    // v3 REST base, e.g. https://<appId>.api-us.cometchat.io/v3
+    baseUrl:
+      cometchatAppId && cometchatRegion
+        ? `https://${cometchatAppId}.api-${cometchatRegion}.cometchat.io/v3`
+        : '',
+    // True only when the server has everything it needs to mint tokens.
+    configured: cometchatConfigured,
+  },
 } as const;

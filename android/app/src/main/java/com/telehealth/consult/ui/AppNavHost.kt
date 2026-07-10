@@ -13,6 +13,7 @@ import com.telehealth.consult.ui.admin.AdminAuditScreen
 import com.telehealth.consult.ui.admin.AdminClinicsScreen
 import com.telehealth.consult.ui.admin.AdminUsersScreen
 import com.telehealth.consult.ui.appointment.AppointmentDetailScreen
+import com.telehealth.consult.ui.consult.ConsultChatScreen
 import com.telehealth.consult.ui.doctor.DoctorScheduleScreen
 import com.telehealth.consult.ui.patient.BookScreen
 import com.telehealth.consult.ui.patient.BrowseDoctorsScreen
@@ -91,6 +92,20 @@ fun AppNavHost(
             arguments = listOf(navArgument(Routes.ARG_APPOINTMENT_ID) { type = NavType.StringType }),
         ) { entry ->
             AppointmentDetailScreen(
+                appointmentId = entry.arguments?.getString(Routes.ARG_APPOINTMENT_ID).orEmpty(),
+                user = user,
+                onBack = { navController.popBackStack() },
+                onOpenChat = { id -> navController.navigate(Routes.consult(id)) },
+            )
+        }
+
+        // Phase B: the 1:1 chat + video/voice surface for a consult. The backend
+        // enforces who may participate; non-participants see a notice here.
+        composable(
+            Routes.CONSULT_CHAT,
+            arguments = listOf(navArgument(Routes.ARG_APPOINTMENT_ID) { type = NavType.StringType }),
+        ) { entry ->
+            ConsultChatScreen(
                 appointmentId = entry.arguments?.getString(Routes.ARG_APPOINTMENT_ID).orEmpty(),
                 user = user,
                 onBack = { navController.popBackStack() },

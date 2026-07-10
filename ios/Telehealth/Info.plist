@@ -45,5 +45,17 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Phase B (CometChat) — voice/video consults need camera + mic, and VoIP
+	     background modes for incoming calls while backgrounded. -->
+	<key>NSCameraUsageDescription</key>
+	<string>So you can be seen by your doctor or patient during a video consult.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>So you can talk during a voice or video consult.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>voip</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

@@ -75,5 +75,10 @@ final class SessionStore: ObservableObject {
         defaults.removeObject(forKey: tokenKey)
         defaults.removeObject(forKey: userKey)
         phase = .signedOut
+        // Tear down the CometChat session too, so the next user on this device
+        // starts clean (Phase B).
+        #if canImport(CometChatUIKitSwift)
+        CometChatService.shared.disconnect()
+        #endif
     }
 }
