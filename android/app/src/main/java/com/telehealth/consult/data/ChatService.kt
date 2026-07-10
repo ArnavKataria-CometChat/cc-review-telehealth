@@ -158,11 +158,34 @@ class ChatService(
         callScope.launch {
             CometChatEvents.callEvents.collect { event ->
                 when (event) {
-                    is CometChatCallEvent.CallEnded,
+                    is CometChatCallEvent.CallEnded -> {
+                        _incomingCall.value = null
+                        // The UI Kit launches CometChatOngoingCallActivity in its OWN
+                        // task (FLAG_ACTIVITY_NEW_TASK), so when the call ends and that
+                        // activity finishes, Android returns to HOME — the app looks
+                        // like it "exited". Bring our own task back to the foreground so
+                        // the user lands back in the app (the consult), not the launcher.
+                        returnToForeground()
+                    }
                     is CometChatCallEvent.CallRejected -> _incomingCall.value = null
                     else -> Unit
                 }
             }
+        }
+    }
+
+    /** Re-surface the app's own task after the ongoing-call activity (a separate
+     *  task) finishes, so ending a call returns to the app instead of the home screen. */
+    private fun returnToForeground() {
+        runCatching {
+            val intent = android.content.Intent().apply {
+                setClassName(appContext, "com.telehealth.consult.MainActivity")
+                addFlags(
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                        android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
+                )
+            }
+            appContext.startActivity(intent)
         }
     }
 

@@ -147,6 +147,11 @@ private fun ConversationPanel(peer: ChatParticipant) {
                 modifier = Modifier.fillMaxWidth(),
                 user = target,
                 hideBackButton = true,
+                // Show the audio + video call buttons in the header (they default to
+                // hidden in this UI Kit version, which is why the chat had no call
+                // option). This is the in-place call-initiate affordance.
+                hideVoiceCallButton = false,
+                hideVideoCallButton = false,
             )
             CometChatMessageList(
                 modifier = Modifier
