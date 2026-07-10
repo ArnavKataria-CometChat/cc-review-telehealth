@@ -79,6 +79,9 @@ class ChatService(
     // App-lifetime scope for observing the UI Kit's call-lifecycle event bus.
     private val callScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
+    // The kit's ongoing-call activity, while one is alive (see trackOngoingCallActivity).
+    private var ongoingCallActivity: java.lang.ref.WeakReference<android.app.Activity>? = null
+
     /** Initialize the SDK once (call from Application.onCreate). Safe to call once. */
     fun initialize() {
         if (!isConfigured) {
@@ -106,6 +109,7 @@ class ChatService(
                     initCallsSdk()
                     registerCallListener()
                     observeCallLifecycle()
+                    trackOngoingCallActivity()
                     initGate.complete(true)
                 }
 
@@ -174,6 +178,66 @@ class ChatService(
         }
     }
 
+    /**
+     * Keep a weak handle on the UI Kit's ongoing-call activity
+     * (CometChatOngoingCallActivity, launched in its OWN task) while it is alive,
+     * so [teardownGhostCall] can finish it when the REMOTE party ends a 1:1 call.
+     */
+    private fun trackOngoingCallActivity() {
+        val app = appContext as? android.app.Application ?: return
+        app.registerActivityLifecycleCallbacks(
+            object : android.app.Application.ActivityLifecycleCallbacks {
+                override fun onActivityCreated(a: android.app.Activity, b: android.os.Bundle?) {
+                    if (a.javaClass.name.contains("OngoingCall")) {
+                        ongoingCallActivity = java.lang.ref.WeakReference(a)
+                    }
+                }
+                override fun onActivityDestroyed(a: android.app.Activity) {
+                    if (ongoingCallActivity?.get() === a) ongoingCallActivity = null
+                }
+                override fun onActivityStarted(a: android.app.Activity) = Unit
+                override fun onActivityResumed(a: android.app.Activity) = Unit
+                override fun onActivityPaused(a: android.app.Activity) = Unit
+                override fun onActivityStopped(a: android.app.Activity) = Unit
+                override fun onActivitySaveInstanceState(a: android.app.Activity, b: android.os.Bundle) = Unit
+            },
+        )
+    }
+
+    /**
+     * Ghost-call teardown (mirror of the iOS I4 gap): when the REMOTE party ends a
+     * 1:1 call, the UI Kit's ongoing-call screen does NOT auto-dismiss — the calls
+     * session is a conference, so the last remote leaving strands the local user in
+     * a "conference of one" with the timer running. The end signal DOES arrive
+     * ([CometChat.CallListener.onCallEndedMessageReceived], a default no-op the
+     * baseline never overrode) — act on it: finish the kit's ongoing-call activity
+     * (it lives in its own task) and clear the active call. Guarded on the tracked
+     * activity so a LOCAL hang-up (which the kit already tears down) is a no-op.
+     */
+    private fun teardownGhostCall(reason: String, call: Call? = null) {
+        val activity = ongoingCallActivity?.get()
+        Log.i("ChatService", "X1C_ANDROID: $reason ongoing=${activity != null}")
+        if (activity == null || activity.isFinishing || activity.isDestroyed) return
+        ongoingCallActivity = null
+        _incomingCall.value = null
+        // CRITICAL: also end the calls-SDK media session. The kit's own end-button
+        // path does this internally; finishing the activity from outside skips it,
+        // and a stale media session blocks every subsequent call from joining until
+        // the app is fully killed.
+        runCatching { CometChatCalls.endSession() }
+        runCatching { CometChat.clearActiveCall() }
+        // Equally critical: fan the end out on the KIT's event bus so every kit
+        // component (header call buttons, ongoing-call view model) resets its
+        // internal "call in progress" state — the kit's own end-button path emits
+        // this, but a REMOTE end emits nothing, and stale kit state silently
+        // blocks the next call.
+        if (call != null) {
+            runCatching { CometChatEvents.emitCallEvent(CometChatCallEvent.CallEnded(call)) }
+        }
+        activity.finishAndRemoveTask() // its own task — remove it entirely
+        returnToForeground()
+    }
+
     /** Re-surface the app's own task after the ongoing-call activity (a separate
      *  task) finishes, so ending a call returns to the app instead of the home screen. */
     private fun returnToForeground() {
@@ -208,6 +272,13 @@ class ChatService(
 
                 override fun onIncomingCallCancelled(call: Call) {
                     _incomingCall.value = null
+                }
+
+                // Default no-op in the SDK — MUST be overridden or the ongoing-call
+                // screen ghosts when the REMOTE party ends a 1:1 call (see
+                // teardownGhostCall).
+                override fun onCallEndedMessageReceived(call: Call) {
+                    teardownGhostCall("onCallEndedMessageReceived", call)
                 }
             },
         )

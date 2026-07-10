@@ -134,7 +134,6 @@ struct ConsultRoomLiveView: View {
     @State private var access: AppointmentChatAccess?
     @State private var peer: User?
     @State private var phase: Phase = .loading
-    @State private var showChat = false
     @State private var didStartLoad = false
 
     private enum Phase: Equatable { case loading, ready, denied(String), failed(String), unconfigured }
@@ -165,11 +164,6 @@ struct ConsultRoomLiveView: View {
             didStartLoad = true
             await load()
         }
-        .sheet(isPresented: $showChat) {
-            if let peer {
-                ConsultChatView(user: peer).ignoresSafeArea()
-            }
-        }
     }
 
     @ViewBuilder
@@ -187,8 +181,27 @@ struct ConsultRoomLiveView: View {
                 }
             }
             if access.canChat {
-                Button {
-                    showChat = true
+                // Push the conversation onto the existing NavigationStack rather than
+                // presenting it as a `.sheet`. The CometChat UI Kit's in-app
+                // incoming-call UI (`enable(inAppIncomingCall:)`) presents
+                // `CometChatIncomingCall` on the key-window ROOT controller — a modal
+                // sheet occupies that root's single `presentedViewController` slot, so
+                // an inbound call while the chat is open is dropped with
+                // "…which is already presenting". A push keeps the root's modal slot
+                // free, so both the incoming popup and the post-accept ongoing-call
+                // screen present cleanly. (Skill gap I3: the kit should present from the
+                // top-most controller, not root.)
+                NavigationLink {
+                    // Full-bleed conversation. The CometChatMessageHeader already
+                    // provides its own back button (wired via set(controller:), which
+                    // pops the nav stack), the peer name/avatar, and the call buttons —
+                    // so hide the SwiftUI navigation bar to avoid a duplicate back
+                    // chevron, and hide the tab bar so the composer isn't overlapped by
+                    // it (the sheet used to cover both; the push must opt back out).
+                    ConsultChatView(user: peer)
+                        .ignoresSafeArea()
+                        .toolbar(.hidden, for: .navigationBar)
+                        .toolbar(.hidden, for: .tabBar)
                 } label: {
                     Label("Open Secure Chat", systemImage: "bubble.left.and.bubble.right.fill")
                 }

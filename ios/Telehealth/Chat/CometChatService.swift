@@ -44,6 +44,10 @@ final class CometChatService: ObservableObject {
             try await initializeIfNeeded(appID: token.appId, region: token.region)
             let user = try await login(authToken: token.authToken, expectedUID: token.uid)
             let uid = user.uid ?? token.uid
+            // Start listening for remote call-end so the ongoing-call UI is torn
+            // down when the peer hangs up a 1:1 call (skill gap X1c — see
+            // CallTeardownObserver). Idempotent.
+            CallTeardownObserver.shared.start()
             state = .ready(uid: uid)
             return uid
         } catch {
