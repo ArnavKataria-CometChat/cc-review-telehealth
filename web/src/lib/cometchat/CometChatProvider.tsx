@@ -23,7 +23,10 @@ import {
   CometChatUIKit,
   UIKitSettingsBuilder,
   CometChatIncomingCall,
+  CometChatCallEvents,
+  CometChatUIEvents,
 } from '@cometchat/chat-uikit-react';
+import { CometChatCalls } from '@cometchat/calls-sdk-javascript';
 import '@cometchat/chat-uikit-react/css-variables.css';
 
 import { api, ApiError } from '@/lib/api';
@@ -61,6 +64,13 @@ async function ensureInitialized(appId: string, region: string): Promise<void> {
     .subscribePresenceForAllUsers()
     .build();
   await CometChatUIKit.init(settings);
+  // X1 fix: initialize the WebRTC Calls SDK. Without this the call rings but never
+  // connects (no media session). Required alongside mounting the ongoing-call view.
+  const callAppSetting = new CometChatCalls.CallAppSettingsBuilder()
+    .setAppId(appId)
+    .setRegion(region)
+    .build();
+  await CometChatCalls.init(callAppSetting);
   initialized = true;
 }
 
@@ -87,6 +97,24 @@ export function CometChatProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [notConfigured, setNotConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ongoingCall, setOngoingCall] = useState<React.ReactNode>(null);
+
+  // X1 fix: when a call is accepted the UI Kit emits the ready-made ongoing-call
+  // view via `ccShowOngoingCall`. The original integration mounted only
+  // <CometChatIncomingCall/> and never rendered this — so calls rang but never
+  // connected (no session host). Render the emitted child; clear on end/reject.
+  useEffect(() => {
+    const show = CometChatUIEvents.ccShowOngoingCall.subscribe(
+      (payload: { child?: React.ReactNode }) => setOngoingCall(payload?.child ?? null),
+    );
+    const ended = CometChatCallEvents.ccCallEnded.subscribe(() => setOngoingCall(null));
+    const rejected = CometChatCallEvents.ccCallRejected.subscribe(() => setOngoingCall(null));
+    return () => {
+      show.unsubscribe();
+      ended.unsubscribe();
+      rejected.unsubscribe();
+    };
+  }, []);
 
   // Log the telehealth user in/out of CometChat in lockstep with the session.
   useEffect(() => {
@@ -134,6 +162,7 @@ export function CometChatProvider({ children }: { children: React.ReactNode }) {
     <CometChatContext.Provider value={{ isReady, notConfigured, error }}>
       {children}
       {isReady ? <CometChatIncomingCall /> : null}
+      {ongoingCall}
     </CometChatContext.Provider>
   );
 }

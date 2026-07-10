@@ -1,17 +1,26 @@
 package com.telehealth.consult.data
 
 import android.content.Context
+import android.util.Log
+import com.cometchat.calls.core.CallAppSettings
+import com.cometchat.calls.core.CometChatCalls
 import com.cometchat.chat.core.Call
 import com.cometchat.chat.core.CometChat
 import com.cometchat.chat.exceptions.CometChatException
 import com.cometchat.chat.models.User
 import com.cometchat.uikit.core.CometChatUIKit
 import com.cometchat.uikit.core.UIKitSettings
+import com.cometchat.uikit.core.events.CometChatCallEvent
+import com.cometchat.uikit.core.events.CometChatEvents
 import com.telehealth.consult.BuildConfig
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,6 +76,9 @@ class ChatService(
     private val initGate = CompletableDeferred<Boolean>()
     private val loginMutex = Mutex()
 
+    // App-lifetime scope for observing the UI Kit's call-lifecycle event bus.
+    private val callScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+
     /** Initialize the SDK once (call from Application.onCreate). Safe to call once. */
     fun initialize() {
         if (!isConfigured) {
@@ -86,7 +98,14 @@ class ChatService(
             settings,
             object : CometChat.CallbackListener<String>() {
                 override fun onSuccess(result: String) {
+                    // The Chat SDK init only wires call *signalling* (incoming/outgoing
+                    // events). The actual WebRTC media session used by the ongoing-call
+                    // screen lives in the separate calls SDK, which needs its OWN init —
+                    // without it, joining a session throws "Please call the
+                    // CometChatCalls.init() method ..." and the call never connects.
+                    initCallsSdk()
                     registerCallListener()
+                    observeCallLifecycle()
                     initGate.complete(true)
                 }
 
@@ -96,6 +115,55 @@ class ChatService(
                 }
             },
         )
+    }
+
+    // Initialize the calls (WebRTC) SDK so accepting a call can join its media
+    // session. Idempotent — the SDK guards against re-init via isInitialized().
+    private fun initCallsSdk() {
+        if (CometChatCalls.isInitialized()) return
+        val callSettings = CallAppSettings.CallAppSettingBuilder()
+            .setAppId(BuildConfig.COMETCHAT_APP_ID)
+            .setRegion(BuildConfig.COMETCHAT_REGION)
+            .build()
+        CometChatCalls.init(
+            appContext,
+            callSettings,
+            object : CometChatCalls.CallbackListener<String>() {
+                override fun onSuccess(result: String) = Unit
+                override fun onError(e: com.cometchat.calls.exceptions.CometChatException) {
+                    // Non-fatal for chat: calls simply won't connect. Surface for logs.
+                    Log.e("ChatService", "CometChatCalls.init failed: ${e.message}")
+                }
+            },
+        )
+    }
+
+    /**
+     * The base [CometChat.CallListener] only reports the *ringing* phases
+     * (received / cancelled / outgoing-accepted / outgoing-rejected). It has no
+     * "the call ended" callback, so once the receiver accepts a call the root
+     * overlay's [_incomingCall] stays set — and re-appears as a stale "accept"
+     * popup when the ongoing-call screen closes and the app is resumed. The UI
+     * Kit publishes the terminal transitions on [CometChatEvents.callEvents];
+     * clear the overlay when the call ends or is rejected.
+     *
+     * NOTE: deliberately does NOT clear on [CometChatCallEvent.CallAccepted] —
+     * the accepting side emits CallAccepted while the UI Kit is still handing the
+     * call off to the ongoing-call screen, and tearing the incoming composable
+     * down at that instant aborts the receiver's join (the call would connect on
+     * the caller's side only). Clearing on CallEnded is enough: it fires before
+     * the app is ever resumed to the point where the stale popup could show.
+     */
+    private fun observeCallLifecycle() {
+        callScope.launch {
+            CometChatEvents.callEvents.collect { event ->
+                when (event) {
+                    is CometChatCallEvent.CallEnded,
+                    is CometChatCallEvent.CallRejected -> _incomingCall.value = null
+                    else -> Unit
+                }
+            }
+        }
     }
 
     // Surface incoming calls app-wide so the root overlay can ring on any screen.

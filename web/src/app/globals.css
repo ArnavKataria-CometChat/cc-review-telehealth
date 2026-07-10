@@ -697,13 +697,58 @@ tbody tr:hover {
   background: var(--surface);
 }
 
+/* W1 fix (v2, verified via DOM): the kit `.cometchat` wrapper is `flex: 0 1 auto`
+   and grew to its full content height (851px) inside the 403px list, so history was
+   clipped and unscrollable. `height:100%` didn't constrain it (kit rule wins), so
+   make `.cc-list` a flex COLUMN and force the wrapper to `flex: 1 1 0 !important` —
+   flexbox then bounds it to the list height, and the kit's own `overflow-y:auto`
+   body scrolls. */
 .cc-consult .cc-list {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .cc-consult .cc-list > .cometchat {
-  height: 100%;
+  flex: 1 1 0 !important;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* W1+W4 clean fix: the kit's own CSS (loaded via css-variables.css -> components/index.css)
+   already lays out the message list (`__body { height:100%; display:flex-column }`) and
+   handles its own scroll. Just bound `.cometchat` above and give the kit root a definite
+   100% height; do NOT override the kit's internal flex/overflow (that collapsed the body). */
+.cc-consult .cc-list > .cometchat > .cometchat-message-list {
+  height: 100%;
+  min-height: 0;
+}
+
+/* W2 fix: the incoming-call PROMPT (the standalone component, exact class only —
+   NOT `[class*=incoming-call]`, which also matches the `cometchat-message-bubble__
+   incoming-call` call-log bubbles and would hijack the chat) as a centered top overlay. */
+.cometchat-incoming-call {
+  position: fixed !important;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: min(420px, 92vw);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+}
+
+/* W3 fix: the ongoing/outgoing CALL surface (exact component classes only — the broad
+   `[class*=...]` matched `cometchat-message-bubble__outgoing-call` chat bubbles and turned
+   them into a full-screen black overlay, blanking the consultation). */
+.cometchat-ongoing-call,
+.cometchat-outgoing-call {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
 }

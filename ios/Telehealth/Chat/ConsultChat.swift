@@ -125,12 +125,17 @@ struct ConsultRoomLiveView: View {
     let appointment: Appointment
 
     @EnvironmentObject private var session: SessionStore
-    @StateObject private var chat = CometChatService.shared
+    // Was `@StateObject private var chat = CometChatService.shared` — wrapping a shared
+    // singleton in @StateObject drove a re-render/task loop that re-fired the access
+    // fetch endlessly and never reached .ready. We only call methods on it, so hold a
+    // plain reference (no view observation).
+    private let chat = CometChatService.shared
 
     @State private var access: AppointmentChatAccess?
     @State private var peer: User?
     @State private var phase: Phase = .loading
     @State private var showChat = false
+    @State private var didStartLoad = false
 
     private enum Phase: Equatable { case loading, ready, denied(String), failed(String), unconfigured }
 
@@ -153,7 +158,13 @@ struct ConsultRoomLiveView: View {
                 readyContent
             }
         }
-        .task(id: appointment.id) { await load() }
+        .task(id: appointment.id) {
+            // Run exactly once per appointment — guard against any re-render/task
+            // re-fire so the access fetch + CometChat connect can't storm.
+            guard !didStartLoad else { return }
+            didStartLoad = true
+            await load()
+        }
         .sheet(isPresented: $showChat) {
             if let peer {
                 ConsultChatView(user: peer).ignoresSafeArea()
